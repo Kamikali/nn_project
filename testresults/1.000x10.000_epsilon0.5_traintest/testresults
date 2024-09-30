@@ -1,0 +1,5 @@
+[{'batch_nr': 0, 'qplayer_wins': 9026, 'random_wins': 53, 'draws': 921},
+ {'batch_nr': 1, 'qplayer_wins': 8996, 'random_wins': 52, 'draws': 952},
+ {'batch_nr': 2, 'qplayer_wins': 8991, 'random_wins': 51, 'draws': 958},
+ {'batch_nr': 3, 'qplayer_wins': 9010, 'random_wins': 60, 'draws': 930},
+ {'batch_nr': 4, 'qplayer_wins': 8998, 'random_wins': 56, 'draws': 946}]

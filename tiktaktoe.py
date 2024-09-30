@@ -1,6 +1,8 @@
 import numpy as np
 from enum import Enum
-
+import torch
+import torch.nn as nn
+import random
 
 class PlayerNr(Enum):
     """
@@ -63,10 +65,127 @@ class InputPlayer(Player):
                 A game object of TikTakToe
         """
 
+        
         field = int(input("Take a field, 0 - 8: "))
 
         while field not in range(0, 9):
             field = int(input("Wrong input. Take a field, 0 - 8: "))
+        game.occupy_field(self, self.player_nr, field)
+
+
+class NNPlayer(Player):
+
+    """
+    A player that asks for user input every turn.
+    """
+
+    def __init__(self, model) -> None:
+        super().__init__()
+        self.model = model  
+
+    def get_best_action(self,model_output, available_fields):
+        model_output = model_output.squeeze(0)  
+
+        # Create a mask filled with negative infinity
+        mask = torch.full_like(model_output, float('-inf'))  # Shape should match model_output
+        
+        mask[available_fields] = model_output[available_fields]  
+
+        # Get the index of the maximum value in the masked output
+        best_action = torch.argmax(mask)
+        
+        return best_action
+
+    def take_field(self, game, moves_made=list(), epsilon=0.0) -> bool:
+        """
+        Makes a random legal move in a given game
+
+        Parameters:
+            game:
+                A game object of TikTakToe
+        """
+        input = game.get_nn_input(self.player_nr)
+        input = input.unsqueeze(0)
+        
+        output = self.model(input)
+        
+        available_fields = game.get_available_fields() # returns a list with available fields
+        
+        best_action = self.get_best_action(output, available_fields)
+
+        # chance epsilon
+        if epsilon > random.random():
+            best_action = random.choice(available_fields)
+
+        moves_made.append((self.player_nr, input, best_action))
+        game.occupy_field(self, self.player_nr, best_action)
+
+class NN(nn.Module):
+    def __init__(self):
+        super(NN, self).__init__()
+        
+        # Define the layers
+        self.flatten = nn.Flatten()  # In case your input is a 3x9 tensor and needs to be flattened
+        self.fc1 = nn.Linear(27, 216)  # Input layer (3x9 = 27 neurons) -> First hidden layer (25 neurons)
+        self.fc2 = nn.Linear(216, 108)  # First hidden layer (25 neurons) -> Second hidden layer (25 neurons)
+        self.fc3 = nn.Linear(108, 54)  # First hidden layer (25 neurons) -> Second hidden layer (25 neurons)
+        self.fc4 = nn.Linear(54, 9)   # Second hidden layer (25 neurons) -> Output layer (9 neurons)
+        
+        # Activation function (ReLU in this case)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        # Forward pass through the network
+        x = self.flatten(x)  # Flatten input (if necessary)
+        x = self.relu(self.fc1(x))  # First hidden layer with ReLU
+        x = self.relu(self.fc2(x))  # Second hidden layer with ReLU
+        x = self.relu(self.fc3(x)) 
+        x = self.fc4(x)  # Output layer (no activation here for now, might add Softmax if needed)
+        return x
+
+
+class QPlayer(Player):
+
+    """
+    A player that asks for user input every turn.
+    """
+
+    def __init__(self, qtable: dict, epsilon) -> None:
+        super().__init__()
+        self.qtable = qtable
+        self.epsilon = epsilon
+
+    def take_field(self, game, game_log, change_epsilon=True):
+        """
+        Makes a random legal move in a given game
+
+        Parameters:
+            game:
+                A game object of TikTakToe
+            qtable:
+                A qtable the player uses to make a decision.
+        """
+
+
+        available_fields = game.get_available_fields() # returns a list with available fields
+
+        if game.get_qtable_entry(self.player_nr) not in self.qtable:
+            self.qtable[game.get_qtable_entry(self.player_nr)] = [(field, 0.0) for field in available_fields] # initiates list of tuples with (field, qvalue=0)
+            #self.qtable[game.get_qtable_entry(self.player_nr)] = [(field, 0.0) for field in available_fields] # initiates list of tuples with (field, qvalue=0)
+            field = random.choice(self.qtable[game.get_qtable_entry(self.player_nr)])[0]
+        
+        if random.random() < self.epsilon and change_epsilon:
+            field = random.choice(self.qtable[game.get_qtable_entry(self.player_nr)])[0]
+        else:
+            state_values = self.qtable[game.get_qtable_entry(self.player_nr)]
+            max_value = max(state_values, key=lambda item: item[1])
+            max_values = [item for item in state_values if item[1] == max_value[1]]
+            field = random.choice(max_values)[0]
+
+        game_log.append((self.player_nr, game.get_qtable_entry(self.player_nr), field))
+        #game_log.append((self.player_nr, {game.get_qtable_entry(self.player_nr): field}))
+
+
         game.occupy_field(self, self.player_nr, field)
 
 
@@ -118,6 +237,7 @@ class TikTakToe():
         player_o: a ference to the second player
         player_turn: Of type PlayerNr. Holds which player can make the next move.
         is_ongoing: boolean whether a game is finished or not
+        game_log: list, contains moves made by QPlayers in this form: (player_nr, state, action)
 
 
     Methods:
@@ -176,11 +296,14 @@ class TikTakToe():
         self.is_ongoing = True
         self.result = None # will be set after game has ended
 
+        self.game_log = list()
+
     def reset(self):
         self.player_x.fields_taken = list()
         self.player_o.fields_taken = list()
         self.player_turn = PlayerNr.X
         self.is_ongoing = True
+        self.game_log = list()
 
     def get_game_matrix(self) -> list:
         
@@ -203,7 +326,7 @@ class TikTakToe():
             raw:
                 If set to true, print the game_matrix as its original list form.
         """
-        
+
         game_matrix = self.get_game_matrix()
 
         if raw:
@@ -221,6 +344,57 @@ class TikTakToe():
 
             pretty_matrix = np.char.array(pretty_matrix)
             print(pretty_matrix.reshape((3, 3)))
+
+    def get_qtable_entry(self, pov: PlayerNr) -> str:
+        
+        """
+        pov: Used to make the qtables look same for both players, self is x, opponent is o
+        """
+
+        qtable_entry = ''
+        for field in self.get_game_matrix(): # returns [1, 0, -1, 1, -1, 0, 1, 1, -1]
+            if field == 0: 
+                qtable_entry += '-'
+            if field == pov.value:
+                qtable_entry += 'x'
+            elif field != 0 and field != pov.value:
+                qtable_entry += 'o'
+
+        return qtable_entry
+    
+
+    def get_nn_input(self, pov):
+        
+        input_string = self.get_qtable_entry(pov=pov) # we are using our qtable entry generator here
+
+        # Define the mappings
+        mapping = {
+            'x': [1, 0, 0],  
+            '-': [0, 1, 0], 
+            'o': [0, 0, 1]   
+        }
+        
+        if len(input_string) != 9:
+            raise ValueError("Input string must have exactly 9 characters.")
+        
+        tensor_data = [mapping[char] for char in input_string]
+        
+        tensor = torch.tensor(tensor_data, dtype=torch.float32).reshape(9, 3)
+        
+        return tensor
+
+    def get_state(self) -> str:
+        return str(self.get_game_matrix())
+    
+    def is_occupied(self, field) -> bool:
+        return field in self.player_o.fields_taken or field in self.player_x.fields_taken
+    
+    def get_available_fields(self):
+        available_fields = list()
+        for i in range(0, 9):
+            if not self.is_occupied(i):
+                available_fields.append(i)
+        return available_fields
 
     def occupy_field(self, player: Player, player_nr: PlayerNr, field) -> bool:
         
@@ -244,7 +418,7 @@ class TikTakToe():
         
         # check for win
         if self.check_for_win(player):
-            print(f"Player {player.player_nr} has won the game!")
+            #print(f"Player {player.player_nr} has won the game!")
 
             if player.player_nr == PlayerNr.X:
                 self.result = 'x_win'
@@ -253,8 +427,8 @@ class TikTakToe():
             else:
                 self.result = 'error'
             self.is_ongoing = False
-        if self.check_for_draw():
-            print("Draw! All fields are taken.")
+        elif self.check_for_draw():
+            #print("Draw! All fields are taken.")
             self.result = 'draw'
             self.is_ongoing = False
 
