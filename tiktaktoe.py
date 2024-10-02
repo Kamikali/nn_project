@@ -76,7 +76,7 @@ class InputPlayer(Player):
 class NNPlayer(Player):
 
     """
-    A player that asks for user input every turn.
+    A player that uses a NN to make a decision.
     """
 
     def __init__(self, model) -> None:
@@ -120,34 +120,13 @@ class NNPlayer(Player):
         moves_made.append((self.player_nr, input, best_action))
         game.occupy_field(self, self.player_nr, best_action)
 
-class NN(nn.Module):
-    def __init__(self):
-        super(NN, self).__init__()
-        
-        # Define the layers
-        self.flatten = nn.Flatten()  # In case your input is a 3x9 tensor and needs to be flattened
-        self.fc1 = nn.Linear(27, 216)  # Input layer (3x9 = 27 neurons) -> First hidden layer (25 neurons)
-        self.fc2 = nn.Linear(216, 108)  # First hidden layer (25 neurons) -> Second hidden layer (25 neurons)
-        self.fc3 = nn.Linear(108, 54)  # First hidden layer (25 neurons) -> Second hidden layer (25 neurons)
-        self.fc4 = nn.Linear(54, 9)   # Second hidden layer (25 neurons) -> Output layer (9 neurons)
-        
-        # Activation function (ReLU in this case)
-        self.relu = nn.ReLU()
 
-    def forward(self, x):
-        # Forward pass through the network
-        x = self.flatten(x)  # Flatten input (if necessary)
-        x = self.relu(self.fc1(x))  # First hidden layer with ReLU
-        x = self.relu(self.fc2(x))  # Second hidden layer with ReLU
-        x = self.relu(self.fc3(x)) 
-        x = self.fc4(x)  # Output layer (no activation here for now, might add Softmax if needed)
-        return x
 
 
 class QPlayer(Player):
 
     """
-    A player that asks for user input every turn.
+    A player that relies on a qtable to make a decision.
     """
 
     def __init__(self, qtable: dict, epsilon) -> None:
@@ -465,3 +444,31 @@ class TikTakToe():
                 return True
             
         return False
+
+
+
+
+# I USED CHATGPT TO HAVE THE PYTORCH BOILERPLATE CODE BELOW FOR A NN CREATED
+
+class NN(nn.Module):
+    def __init__(self):
+        super(NN, self).__init__()
+        
+        # Define the layers
+        self.flatten = nn.Flatten()  # 3x9 tensor needs to be flattened
+        self.fc1 = nn.Linear(27, 216) 
+        self.fc2 = nn.Linear(216, 108)  
+        self.fc3 = nn.Linear(108, 54)  
+        self.fc4 = nn.Linear(54, 9)  
+        
+        # Activation function 
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        # Forward pass through the network
+        x = self.flatten(x)  # Flatten input (if necessary)
+        x = self.relu(self.fc1(x)) 
+        x = self.relu(self.fc2(x))  
+        x = self.relu(self.fc3(x)) 
+        x = self.fc4(x)  
+        return x
