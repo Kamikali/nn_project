@@ -122,6 +122,35 @@ class NNPlayer(Player):
 
 
 
+##############################################################################
+# I USED CHATGPT TO HAVE THE PYTORCH BOILERPLATE CODE BELOW FOR A NN CREATED #
+##############################################################################
+
+# from there i modified it manually 
+
+class NN(nn.Module):
+    def __init__(self):
+        super(NN, self).__init__()
+        
+        # Define the layers
+        self.flatten = nn.Flatten()  # 3x9 tensor needs to be flattened
+        self.fc1 = nn.Linear(27, 216) 
+        self.fc2 = nn.Linear(216, 108)  
+        self.fc3 = nn.Linear(108, 54)  
+        self.fc4 = nn.Linear(54, 9)  
+        
+        # Activation function 
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        # Forward pass through the network
+        x = self.flatten(x)  # Flatten input (if necessary)
+        x = self.relu(self.fc1(x)) 
+        x = self.relu(self.fc2(x))  
+        x = self.relu(self.fc3(x)) 
+        x = self.fc4(x)  
+        return x
+
 
 class QPlayer(Player):
 
@@ -136,8 +165,6 @@ class QPlayer(Player):
 
     def take_field(self, game, game_log, change_epsilon=True):
         """
-        Makes a random legal move in a given game
-
         Parameters:
             game:
                 A game object of TikTakToe
@@ -444,31 +471,3 @@ class TikTakToe():
                 return True
             
         return False
-
-
-
-
-# I USED CHATGPT TO HAVE THE PYTORCH BOILERPLATE CODE BELOW FOR A NN CREATED
-
-class NN(nn.Module):
-    def __init__(self):
-        super(NN, self).__init__()
-        
-        # Define the layers
-        self.flatten = nn.Flatten()  # 3x9 tensor needs to be flattened
-        self.fc1 = nn.Linear(27, 216) 
-        self.fc2 = nn.Linear(216, 108)  
-        self.fc3 = nn.Linear(108, 54)  
-        self.fc4 = nn.Linear(54, 9)  
-        
-        # Activation function 
-        self.relu = nn.ReLU()
-
-    def forward(self, x):
-        # Forward pass through the network
-        x = self.flatten(x)  # Flatten input (if necessary)
-        x = self.relu(self.fc1(x)) 
-        x = self.relu(self.fc2(x))  
-        x = self.relu(self.fc3(x)) 
-        x = self.fc4(x)  
-        return x
